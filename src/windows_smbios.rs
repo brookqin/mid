@@ -71,18 +71,19 @@ pub(crate) fn parse_smbios_mid(raw_table: &[u8]) -> Result<String, MIDError> {
         offset = structure.next_offset;
     }
 
-    let result: Vec<String> = [
-        fields.system_uuid,
-        fields.system_serial,
-        fields.baseboard_serial,
-        fields.processor_id,
-    ]
-    .into_iter()
-    .flatten()
-    .filter(|value| !value.is_empty())
-    .collect();
+    Ok(format_legacy_mid_result(fields))
+}
 
-    Ok(result.join("|").to_lowercase())
+fn format_legacy_mid_result(fields: WindowsMidFields) -> String {
+    let result = [
+        fields.system_uuid.unwrap_or_default(),
+        fields.system_serial.unwrap_or_default(),
+        fields.baseboard_serial.unwrap_or_default(),
+        fields.processor_id.unwrap_or_default(),
+    ]
+    .join("|");
+
+    result.trim_matches('|').to_lowercase()
 }
 
 struct SmbiosStructure<'a> {
@@ -172,10 +173,6 @@ fn extract_string_field(formatted: &[u8], offset: usize, strings: &[String]) -> 
 fn extract_system_uuid(formatted: &[u8]) -> Option<String> {
     let uuid = formatted.get(8..24)?;
 
-    if uuid.iter().all(|byte| *byte == 0) || uuid.iter().all(|byte| *byte == 0xff) {
-        return None;
-    }
-
     Some(format!(
         "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
         uuid[3],
@@ -199,10 +196,6 @@ fn extract_system_uuid(formatted: &[u8]) -> Option<String> {
 
 fn extract_processor_id(formatted: &[u8]) -> Option<String> {
     let processor_id = formatted.get(8..16)?;
-
-    if processor_id.iter().all(|byte| *byte == 0) || processor_id.iter().all(|byte| *byte == 0xff) {
-        return None;
-    }
 
     let eax = u32::from_le_bytes([
         processor_id[0],
@@ -260,7 +253,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_smbios_mid_skips_missing_and_placeholder_values() {
+    fn parse_smbios_mid_preserves_legacy_slots_and_placeholder_values() {
         let table = raw_smbios_table(vec![
             structure(
                 SMBIOS_TYPE_SYSTEM,
@@ -276,7 +269,36 @@ mod tests {
             structure(SMBIOS_TYPE_END_OF_TABLE, &[], &[]),
         ]);
 
-        assert_eq!(parse_smbios_mid(&table).unwrap(), "");
+        assert_eq!(
+            parse_smbios_mid(&table).unwrap(),
+            "00000000-0000-0000-0000-000000000000|||ffffffffffffffff"
+        );
+    }
+
+    #[test]
+    fn parse_smbios_mid_preserves_inner_empty_baseboard_slot() {
+        let table = raw_smbios_table(vec![
+            structure(
+                SMBIOS_TYPE_SYSTEM,
+                &[
+                    1, 2, 3, 4, 0x33, 0x22, 0x11, 0x00, 0x55, 0x44, 0x77, 0x66, 0x88, 0x99, 0xaa,
+                    0xbb, 0xcc, 0xdd, 0xee, 0xff,
+                ],
+                &["Acme", "Workstation", "1.0", "System-Serial"],
+            ),
+            structure(SMBIOS_TYPE_BASEBOARD, &[1, 2, 3, 0], &["BoardVendor"]),
+            structure(
+                SMBIOS_TYPE_PROCESSOR,
+                &[1, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0],
+                &["CPU0", "GenuineIntel", "Intel"],
+            ),
+            structure(SMBIOS_TYPE_END_OF_TABLE, &[], &[]),
+        ]);
+
+        assert_eq!(
+            parse_smbios_mid(&table).unwrap(),
+            "00112233-4455-6677-8899-aabbccddeeff|system-serial||0000000000000000"
+        );
     }
 
     #[test]

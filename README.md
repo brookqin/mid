@@ -25,14 +25,14 @@ The `key` must not be empty. Machine ID values can change after hardware replace
 
 ```toml
 [dependencies]
-mid = "5.0.1"
+mid = { git = "https://github.com/brookqin/mid" }
 ```
 
 Enable serialization support when needed:
 
 ```toml
 [dependencies]
-mid = { version = "5.0.1", features = ["serde", "serde_json"] }
+mid = { git = "https://github.com/brookqin/mid", features = ["serde", "serde_json"] }
 ```
 
 ## Usage
