@@ -25,9 +25,26 @@ pub(crate) fn get_mid_result() -> Result<String, MIDError> {
         return Err(MIDError::ResultMidError);
     }
 
-    Ok(combined_output
+    Ok(normalize_output(&combined_output))
+}
+
+fn normalize_output(output: &str) -> String {
+    output
         .trim()
         .trim_start_matches('|')
         .trim_end_matches('|')
-        .to_lowercase())
+        .to_lowercase()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_output;
+
+    #[test]
+    fn normalize_output_trims_outer_delimiters_and_lowercases() {
+        assert_eq!(
+            normalize_output(" |UUID-123|BIOS-456|BOARD-789|CPU-ABC| \r\n"),
+            "uuid-123|bios-456|board-789|cpu-abc"
+        );
+    }
 }

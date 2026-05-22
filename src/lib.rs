@@ -95,19 +95,21 @@ pub fn data(key: &str) -> Result<MidData, MIDError> {
     let mid_result_data = get_mid_result();
 
     match mid_result_data {
-        Ok(mid) => {
-            let mid_result: Vec<String> = mid.split('|').map(|s| s.to_string()).collect();
-
-            let hmac_result = HMAC::mac(mid.as_bytes(), key.as_bytes());
-            let mid_hash = hex::encode(hmac_result);
-
-            Ok(MidData {
-                key: String::from(key),
-                result: mid_result,
-                hash: mid_hash,
-            })
-        }
+        Ok(mid) => Ok(build_mid_data(key, &mid)),
         Err(err) => Err(err),
+    }
+}
+
+fn build_mid_data(key: &str, mid: &str) -> MidData {
+    let mid_result: Vec<String> = mid.split('|').map(|s| s.to_string()).collect();
+
+    let hmac_result = HMAC::mac(mid.as_bytes(), key.as_bytes());
+    let mid_hash = hex::encode(hmac_result);
+
+    MidData {
+        key: String::from(key),
+        result: mid_result,
+        hash: mid_hash,
     }
 }
 
@@ -181,4 +183,32 @@ fn test_mid_operations() {
     }
 
     print("mykey");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_mid_data_uses_stable_hmac_input() {
+        let mid = build_mid_data(
+            "secret-key",
+            "model-number|serial-number|hardware-uuid|seid",
+        );
+
+        assert_eq!(mid.key, "secret-key");
+        assert_eq!(
+            mid.result,
+            vec!["model-number", "serial-number", "hardware-uuid", "seid"]
+        );
+        assert_eq!(
+            mid.hash,
+            "97ada9ff00f0d05c7c86c60e650be7fc113695a3252d033654591a8ef25c7e01"
+        );
+    }
+
+    #[test]
+    fn data_rejects_empty_key() {
+        assert!(matches!(data(""), Err(MIDError::EmptyMidKey)));
+    }
 }

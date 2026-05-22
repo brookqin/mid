@@ -55,6 +55,51 @@ fn process_output(output_str: &str, targets: &[&str]) -> String {
     result.join("|")
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{AdditionalData, process_output};
+
+    #[test]
+    fn process_output_keeps_target_order_and_normalizes_values() {
+        let output = "\
+            SEID: SEID-123\n\
+            Hardware UUID: UUID-123\n\
+            Serial Number: SERIAL123\n\
+            Model Number: Mac14,12\n\
+        ";
+        let targets = ["Model Number", "Serial Number", "Hardware UUID", "SEID"];
+
+        assert_eq!(
+            process_output(output, &targets),
+            "mac14,12|serial123|uuid-123|seid-123"
+        );
+    }
+
+    #[test]
+    fn process_output_ignores_empty_target_values() {
+        let output = "\
+            Model Number:\n\
+            Serial Number: SERIAL123\n\
+        ";
+        let targets = ["Model Number", "Serial Number"];
+
+        assert_eq!(process_output(output, &targets), "serial123");
+    }
+
+    #[test]
+    fn extract_languages_removes_defaults_formatting() {
+        let input = r#"(
+            "en-US",
+            "zh-Hans-US"
+        )"#;
+
+        assert_eq!(
+            AdditionalData::extract_languages(input),
+            vec!["en-US", "zh-Hans-US"]
+        );
+    }
+}
+
 impl Default for AdditionalData {
     fn default() -> Self {
         Self::new()

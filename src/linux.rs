@@ -37,3 +37,23 @@ fn process_output(output_str: &str) -> String {
 
     result.join("|").trim().to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::process_output;
+
+    #[test]
+    fn process_output_deduplicates_normalizes_and_sorts_sources() {
+        let output = "\
+            ABCDEF123\n\
+            abcdef123\n\
+            550E8400-E29B-41D4-A716-446655440000\n\
+            \n\
+        ";
+
+        assert_eq!(
+            process_output(output),
+            "550e8400e29b41d4a716446655440000|abcdef123"
+        );
+    }
+}
