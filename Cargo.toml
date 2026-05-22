@@ -3,9 +3,9 @@ name = "mid"
 version = "5.0.1"
 edition = "2024"
 authors = ["doroved"]
-description = "Creating a Machine ID hash for MacOS/Windows/Linux/iOS"
+description = "Creating a Machine ID hash for MacOS/Windows/Linux"
 readme = "README.md"
-repository = "https://github.com/doroved/mid"
+repository = "https://github.com/brookqin/mid"
 license = "MIT OR Apache-2.0"
 keywords = ["hwid", "machineid", "hardware-id", "machineuid", "uuid"]
 categories = ["authentication", "config", "accessibility"]
@@ -13,10 +13,12 @@ include = [
     "src/**/*",
     "Cargo.toml",
     "README.md",
+    "CHANGELOG.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
 ]
 
 [lib]
-crate-type = ["lib", "staticlib"]
 doctest = false
 
 [[example]]
@@ -29,12 +31,6 @@ hex = "0.4.3"
 hmac-sha256 = "1.1.12"
 serde = { version = "1.0.228", features = ["derive"], optional = true }
 serde_json = { version = "1.0.145", optional = true }
-
-[target.'cfg(target_os = "ios")'.dependencies]
-security-framework = "3.5.1"
-core-foundation = "0.10.1"
-nanoid = "0.4.0"
-sha2 = "0.10.9"
 
 [features]
 serde = ["dep:serde"]
