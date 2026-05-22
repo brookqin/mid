@@ -1,4 +1,6 @@
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 use crate::MIDError;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 use std::{ffi::OsStr, process::Command};
 
 #[macro_export]
@@ -10,6 +12,7 @@ macro_rules! debug {
     };
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 pub(crate) fn run_shell_command<S, I>(shell: S, args: I) -> Result<String, MIDError>
 where
     I: IntoIterator<Item = S>,

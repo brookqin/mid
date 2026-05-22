@@ -9,6 +9,8 @@ mod linux;
 mod macos;
 mod utils;
 mod windows;
+#[cfg(any(target_os = "windows", test))]
+mod windows_smbios;
 
 use errors::MIDError;
 use hmac_sha256::HMAC;

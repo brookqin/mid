@@ -5,6 +5,8 @@ use std::fmt;
 pub enum MIDError {
     ExecuteProcessError(std::io::Error),
     ParseError(std::string::FromUtf8Error),
+    ReadSystemDataError(std::io::Error),
+    InvalidSystemData(String),
     ResultMidError,
     EmptyMidKey,
 }
@@ -19,6 +21,12 @@ impl fmt::Display for MIDError {
             }
             MIDError::ParseError(e) => {
                 write!(f, "Error converting output to UTF-8: {e}")
+            }
+            MIDError::ReadSystemDataError(e) => {
+                write!(f, "Failed to read system data: {e}")
+            }
+            MIDError::InvalidSystemData(e) => {
+                write!(f, "Invalid system data: {e}")
             }
             MIDError::ResultMidError => {
                 write!(f, "Empty result machine ID")

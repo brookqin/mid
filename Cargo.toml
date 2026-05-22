@@ -32,6 +32,9 @@ hmac-sha256 = "1.1.12"
 serde = { version = "1.0.228", features = ["derive"], optional = true }
 serde_json = { version = "1.0.145", optional = true }
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_System_SystemInformation"] }
+
 [features]
 serde = ["dep:serde"]
 serde_json = ["dep:serde_json"]

@@ -1,50 +1,42 @@
 #![cfg(target_os = "windows")]
 
 use crate::errors::MIDError;
-use crate::utils::run_shell_command;
+use crate::windows_smbios::parse_smbios_mid;
+use std::io;
+use std::ptr;
+use windows_sys::Win32::System::SystemInformation::{GetSystemFirmwareTable, RSMB};
 
 pub(crate) fn get_mid_result() -> Result<String, MIDError> {
-    let combined_output = run_shell_command(
-        "powershell",
-        [
-            "-WindowStyle",
-            "Hidden",
-            "-command",
-            r#"
-            $csproduct = Get-WmiObject Win32_ComputerSystemProduct | Select-Object -ExpandProperty UUID;
-            $bios = Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber;
-            $baseboard = Get-WmiObject Win32_BaseBoard | Select-Object -ExpandProperty SerialNumber;
-            $cpu = Get-WmiObject Win32_Processor | Select-Object -ExpandProperty ProcessorId;
-            "$csproduct|$bios|$baseboard|$cpu"
-            "#,
-        ],
-    )
-    .unwrap_or(String::new());
+    let firmware_table = read_raw_smbios_table()?;
+    let combined_string = parse_smbios_mid(&firmware_table)?;
 
-    if combined_output.is_empty() {
+    if combined_string.is_empty() {
         return Err(MIDError::ResultMidError);
     }
 
-    Ok(normalize_output(&combined_output))
+    Ok(combined_string)
 }
 
-fn normalize_output(output: &str) -> String {
-    output
-        .trim()
-        .trim_start_matches('|')
-        .trim_end_matches('|')
-        .to_lowercase()
-}
+fn read_raw_smbios_table() -> Result<Vec<u8>, MIDError> {
+    let table_size = unsafe { GetSystemFirmwareTable(RSMB, 0, ptr::null_mut(), 0) };
 
-#[cfg(test)]
-mod tests {
-    use super::normalize_output;
-
-    #[test]
-    fn normalize_output_trims_outer_delimiters_and_lowercases() {
-        assert_eq!(
-            normalize_output(" |UUID-123|BIOS-456|BOARD-789|CPU-ABC| \r\n"),
-            "uuid-123|bios-456|board-789|cpu-abc"
-        );
+    if table_size == 0 {
+        return Err(MIDError::ReadSystemDataError(io::Error::last_os_error()));
     }
+
+    let mut buffer = vec![0u8; table_size as usize];
+    let bytes_written =
+        unsafe { GetSystemFirmwareTable(RSMB, 0, buffer.as_mut_ptr().cast(), table_size) };
+
+    if bytes_written == 0 {
+        return Err(MIDError::ReadSystemDataError(io::Error::last_os_error()));
+    }
+
+    if bytes_written != table_size {
+        return Err(MIDError::InvalidSystemData(format!(
+            "expected {table_size} bytes, got {bytes_written} bytes"
+        )));
+    }
+
+    Ok(buffer)
 }

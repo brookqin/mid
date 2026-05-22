@@ -94,12 +94,13 @@ The crate reads stable hardware fields from `system_profiler SPHardwareDataType 
 
 ### Windows
 
-The crate reads these PowerShell/WMI fields:
+The crate reads the raw SMBIOS firmware table through the Windows
+`GetSystemFirmwareTable` API and uses these fields:
 
-- `Win32_ComputerSystemProduct.UUID`
-- `Win32_BIOS.SerialNumber`
-- `Win32_BaseBoard.SerialNumber`
-- `Win32_Processor.ProcessorId`
+- Type 1 System Information UUID
+- Type 1 System Information serial number
+- Type 2 Baseboard serial number
+- Type 4 Processor ID
 
 ## Cleanup Scope
 
