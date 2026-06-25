@@ -24,7 +24,6 @@ doctest = false
 [[example]]
 name = "example"
 path = "example/main.rs"
-required-features = ["serde", "serde_json"]
 
 [dependencies]
 hex = "0.4.3"
