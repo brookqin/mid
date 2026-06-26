@@ -5,10 +5,7 @@ fn main() {
     print_header("Windows ID source debug");
     print_field("OS", env::consts::OS);
     print_field("Arch", env::consts::ARCH);
-    print_field("Current exe", current_exe());
     println!();
-
-    print_basic_context();
 
     #[cfg(target_os = "windows")]
     print_windows_context();
@@ -23,26 +20,16 @@ fn main() {
     wait_for_enter();
 }
 
-fn print_basic_context() {
-    print_header("Process context");
-    print_field("COMPUTERNAME", env_var("COMPUTERNAME"));
-    print_field("HOSTNAME", env_var("HOSTNAME"));
-    print_field("USERDOMAIN", env_var("USERDOMAIN"));
-    print_field("USERNAME", env_var("USERNAME"));
-    print_field("USERPROFILE", env_var("USERPROFILE"));
-    println!();
-}
-
 #[cfg(target_os = "windows")]
 fn print_windows_context() {
-    print_header("Windows system fields");
+    print_header("Windows MID source fields");
 
     let script = r#"
 function Value($object, $property) {
     if ($null -eq $object) { return "" }
     $value = $object.$property
     if ($null -eq $value) { return "" }
-    return ([string]$value).Trim()
+    return FormatValue $value
 }
 
 function RegValue($path, $name) {
@@ -54,67 +41,58 @@ function RegValue($path, $name) {
     }
 }
 
+function FormatValue($value) {
+    if ($null -eq $value) { return "" }
+    if ($value -is [byte[]]) {
+        return (($value | ForEach-Object { "{0:x2}" -f ([byte]$_) }) -join "")
+    }
+    return ([string]$value).Trim()
+}
+
 function Line($name, $value) {
-    Write-Output ("{0}: {1}" -f $name, $value)
+    Write-Output ("{0}: {1}" -f $name, (FormatValue $value))
+}
+
+function JoinValues($values) {
+    if ($null -eq $values) { return "" }
+    return (($values | Where-Object { $_ } | ForEach-Object { ([string]$_).Trim() } | Sort-Object -Unique) -join ", ")
+}
+
+function JoinCertificateThumbprints($certificates) {
+    if ($null -eq $certificates) { return "" }
+    return (($certificates | Where-Object { $_ -and $_.Thumbprint } | ForEach-Object { $_.Thumbprint.Trim() } | Sort-Object -Unique) -join ", ")
+}
+
+function TpmEndorsementKeyInfo() {
+    try {
+        return Get-TpmEndorsementKeyInfo -HashAlgorithm sha256 -ErrorAction Stop
+    } catch {
+        return $null
+    }
 }
 
 $csProduct = Get-CimInstance -ClassName Win32_ComputerSystemProduct -ErrorAction SilentlyContinue
 $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction SilentlyContinue
 $baseboard = Get-CimInstance -ClassName Win32_BaseBoard -ErrorAction SilentlyContinue
 $processor = Get-CimInstance -ClassName Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1
-$computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue
 $operatingSystem = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction SilentlyContinue
-$activeComputerName = RegValue "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" "ComputerName"
-$computerName = RegValue "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ComputerName" "ComputerName"
+$diskDrives = Get-CimInstance -ClassName Win32_DiskDrive -ErrorAction SilentlyContinue
+$physicalMedia = Get-CimInstance -ClassName Win32_PhysicalMedia -ErrorAction SilentlyContinue
+$tpmEk = TpmEndorsementKeyInfo
 $machineGuid = RegValue "HKLM:\SOFTWARE\Microsoft\Cryptography" "MachineGuid"
-$productId = RegValue "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" "ProductId"
-$installDate = RegValue "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" "InstallDate"
-$installationType = RegValue "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" "InstallationType"
 
-Line "ComputerSystemProduct.UUID" (Value $csProduct "UUID")
-Line "ComputerSystemProduct.IdentifyingNumber" (Value $csProduct "IdentifyingNumber")
-Line "ComputerSystemProduct.Vendor" (Value $csProduct "Vendor")
-Line "ComputerSystemProduct.Name" (Value $csProduct "Name")
+Line "✓ ComputerSystemProduct.UUID" (Value $csProduct "UUID")
+Line "✓ ComputerSystemProduct.IdentifyingNumber" (Value $csProduct "IdentifyingNumber")
 Line "BIOS.SerialNumber" (Value $bios "SerialNumber")
-Line "BIOS.SMBIOSBIOSVersion" (Value $bios "SMBIOSBIOSVersion")
-Line "BIOS.Manufacturer" (Value $bios "Manufacturer")
-Line "BIOS.ReleaseDate" (Value $bios "ReleaseDate")
-Line "BaseBoard.SerialNumber" (Value $baseboard "SerialNumber")
-Line "BaseBoard.Manufacturer" (Value $baseboard "Manufacturer")
-Line "BaseBoard.Product" (Value $baseboard "Product")
-Line "BaseBoard.Version" (Value $baseboard "Version")
-Line "Processor.ProcessorId" (Value $processor "ProcessorId")
-Line "Processor.Name" (Value $processor "Name")
-Line "Processor.Manufacturer" (Value $processor "Manufacturer")
-Line "ComputerSystem.Manufacturer" (Value $computerSystem "Manufacturer")
-Line "ComputerSystem.Model" (Value $computerSystem "Model")
-Line "ComputerSystem.Domain" (Value $computerSystem "Domain")
-Line "ComputerSystem.PartOfDomain" (Value $computerSystem "PartOfDomain")
-Line "ComputerSystem.PrimaryOwnerName" (Value $computerSystem "PrimaryOwnerName")
-Line "OperatingSystem.Caption" (Value $operatingSystem "Caption")
-Line "OperatingSystem.Version" (Value $operatingSystem "Version")
-Line "OperatingSystem.SerialNumber" (Value $operatingSystem "SerialNumber")
-Line "Registry.ActiveComputerName" $activeComputerName
-Line "Registry.ComputerName" $computerName
+Line "✓ BaseBoard.SerialNumber" (Value $baseboard "SerialNumber")
+Line "✓ Processor.ProcessorId" (Value $processor "ProcessorId")
 Line "Registry.MachineGuid" $machineGuid
-Line "Registry.WindowsProductId" $productId
-Line "Registry.WindowsInstallDate" $installDate
-Line "Registry.InstallationType" $installationType
-
-Write-Output ""
-Write-Output "Network adapters:"
-$adapters = Get-CimInstance -ClassName Win32_NetworkAdapterConfiguration -Filter "IPEnabled = True" -ErrorAction SilentlyContinue
-foreach ($adapter in $adapters) {
-    $ips = ""
-    if ($null -ne $adapter.IPAddress) {
-        $ips = ($adapter.IPAddress -join ", ")
-    }
-    Write-Output ("  Description: {0}" -f $adapter.Description)
-    Write-Output ("  MACAddress: {0}" -f $adapter.MACAddress)
-    Write-Output ("  DHCPEnabled: {0}" -f $adapter.DHCPEnabled)
-    Write-Output ("  IPAddress: {0}" -f $ips)
-    Write-Output ""
-}
+Line "OperatingSystem.SerialNumber" (Value $operatingSystem "SerialNumber")
+Line "DiskDrive.SerialNumber" (JoinValues $diskDrives.SerialNumber)
+Line "PhysicalMedia.SerialNumber" (JoinValues $physicalMedia.SerialNumber)
+Line "TPM.EndorsementKey.PublicKeyHash" (Value $tpmEk "PublicKeyHash")
+Line "TPM.EndorsementKey.ManufacturerCertificateThumbprint" (JoinCertificateThumbprints $tpmEk.ManufacturerCertificates)
+Line "TPM.EndorsementKey.AdditionalCertificateThumbprint" (JoinCertificateThumbprints $tpmEk.AdditionalCertificates)
 "#;
 
     match run_powershell(script) {
@@ -163,16 +141,6 @@ fn print_header(title: &str) {
 
 fn print_field(name: &str, value: impl AsRef<str>) {
     println!("{name}: {}", value.as_ref());
-}
-
-fn env_var(name: &str) -> String {
-    env::var(name).unwrap_or_default()
-}
-
-fn current_exe() -> String {
-    env::current_exe()
-        .map(|path| path.display().to_string())
-        .unwrap_or_default()
 }
 
 fn wait_for_enter() {
