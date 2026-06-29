@@ -102,6 +102,11 @@ The crate reads the raw SMBIOS firmware table through the Windows
 - Type 2 Baseboard serial number
 - Type 4 Processor ID
 
+If the BIOS serial number is the placeholder value `System Serial Number`, the
+crate uses the Windows `MachineGuid` and the first internal disk serial number
+instead. If either fallback value exists, it is used instead of the SMBIOS
+fields because that SMBIOS value is not machine-specific.
+
 ## Cleanup Scope
 
 Compared with the source project [doroved/mid](https://github.com/doroved/mid), this repository has been simplified as follows:
